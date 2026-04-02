@@ -1,0 +1,19 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+
+# Package artifacts
+deps/deps.jl
+
+# Docs output
+docs/build/
+docs/site/
+
+# Local environments
+Manifest.toml
+
+# IDE and OS
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,39 @@
+name: Bug report
+description: File a reproducible bug report
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear and concise description of the bug.
+      placeholder: Tell us what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal reproducer.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: julia-version
+    attributes:
+      label: Julia version
+      placeholder: 1.10.4
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      placeholder: OS, CPU, package versions
