@@ -24,7 +24,7 @@ Validation performed:
 
 The core idea works: the package can define a trait, route through a dispatcher, and dispatch on trait state-specific worker methods. The main issue at the start of this review was not nonfunctionality; it was that the user interface, documentation, and tests did not fully agree with the implementation.
 
-Those issues have now been addressed in the current workspace revision. `@trait_dispatcher` preserves the public first-argument signature, the documentation matches the implemented four-macro model, open-world extension has a dedicated `@trait_map` API, internal worker naming is namespaced instead of relying on `_function_name`, and the tests now exercise the real supported contract.
+Those issues have now been addressed in the current workspace revision. `@trait_dispatch` preserves the public first-argument signature, the documentation matches the implemented four-macro model, open-world extension has a dedicated `@trait_map` API, internal worker naming is namespaced instead of relying on `_function_name`, and the tests now exercise the real supported contract.
 
 ## Findings
 
@@ -38,14 +38,14 @@ Relevant code:
 
 Current behavior:
 
-- `@trait_dispatcher` preserves the first argument exactly as written in the public method signature.
-- A typed dispatcher such as `@trait_dispatcher process_items(x::Vector{Int}, y) :: Sequence` now expands to a public method that keeps `x::Vector{Int}` in its signature.
+- `@trait_dispatch` preserves the first argument exactly as written in the public method signature.
+- A typed dispatcher such as `@trait_dispatch process_items(x::Vector{Int}, y) :: Sequence` now expands to a public method that keeps `x::Vector{Int}` in its signature.
 - A mismatched call now fails at the public API boundary rather than leaking into the hidden worker.
 
 Current expansion shape:
 
 ```julia
-@trait_dispatcher process_items(x::Vector{Int}, y) :: Sequence
+@trait_dispatch process_items(x::Vector{Int}, y) :: Sequence
 ```
 
 expands to a public method equivalent to:
@@ -69,7 +69,7 @@ Recommendation outcome:
 Implementation status:
 
 - Fixed in the current workspace revision.
-- `@trait_dispatcher` now preserves the first argument exactly as written in the public method signature.
+- `@trait_dispatch` now preserves the first argument exactly as written in the public method signature.
 - Regression coverage was added to verify that mismatched calls fail at the public API boundary rather than at the hidden worker method.
 
 ### 2. High (Resolved): documentation and implementation now describe the same system
@@ -85,7 +85,7 @@ Relevant files:
 
 Current behavior:
 
-- The README and docs now describe the actual four-macro model: `@def_trait`, `@trait_dispatcher`, `@trait_function`, and `@trait_map`.
+- The README and docs now describe the actual four-macro model: `@def_trait`, `@trait_dispatch`, `@trait_function`, and `@trait_map`.
 - The docs now describe runtime routing in terms of `Trait(x)` producing a trait-state value that is forwarded to an internal worker.
 - Stale claims about `dispatch_trait`, `::Type{Trait}`, and `@generated` behavior have been removed.
 - The typed first-argument note now matches the current dispatcher implementation.
@@ -118,7 +118,7 @@ Relevant code:
 
 Current behavior:
 
-- `@trait_dispatcher foo(x) :: Trait` generates a namespaced internal worker symbol through `trait_worker_name`.
+- `@trait_dispatch foo(x) :: Trait` generates a namespaced internal worker symbol through `trait_worker_name`.
 - `@trait_function foo(...) :: State ...` targets the same namespaced internal worker.
 - User-defined underscore helpers such as `_process_items_collision` no longer collide with the trait worker path.
 
@@ -185,7 +185,7 @@ Relevant code and docs:
 
 Current behavior:
 
-- Public entry-point docs are documented as belonging on `@trait_dispatcher`.
+- Public entry-point docs are documented as belonging on `@trait_dispatch`.
 - Implementation-specific docs are documented as belonging on `@trait_function` methods.
 - The documentation no longer implies that implementation docstrings are automatically merged into the public function symbol.
 
@@ -201,7 +201,7 @@ Recommendation outcome:
 Implementation status:
 
 - Fixed in the current workspace revision.
-- README and docs now distinguish between public entry-point docs on `@trait_dispatcher` and implementation docs on `@trait_function`.
+- README and docs now distinguish between public entry-point docs on `@trait_dispatch` and implementation docs on `@trait_function`.
 
 ### 6. High (Resolved): the test suite now covers the package contract
 
@@ -248,7 +248,7 @@ Implementation status:
 
 ### Where the interface still needs care
 
-- The worker remains an implementation detail, so users still benefit from understanding that `@trait_dispatcher` and `@trait_function` cooperate through generated internals.
+- The worker remains an implementation detail, so users still benefit from understanding that `@trait_dispatch` and `@trait_function` cooperate through generated internals.
 - Public and implementation documentation are now clearly separated, but Julia help/discoverability will still reflect that separation in the method table.
 - Manual trait-resolution methods are still possible, so the semantic contract for those advanced cases remains worth documenting carefully.
 

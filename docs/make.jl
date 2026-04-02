@@ -7,8 +7,11 @@ makedocs(
     modules = [MacroTraits],
     sitename = "MacroTraits.jl",
     format = Documenter.HTML(prettyurls = get(ENV, "CI", "false") == "true"),
+    doctest = false,
     pages = [
         "Home" => "index.md",
+        "Examples" => "examples.md",
+        "Internals" => "internals.md",
     ],
 )
 

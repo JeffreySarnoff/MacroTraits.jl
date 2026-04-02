@@ -1,6 +1,6 @@
 module MacroTraits
 
-export @def_trait, @trait_map, @trait_dispatcher, @trait_function
+export @def_trait, @trait_map, @trait_dispatch, @trait_function
 
 # Internal helper shared by the macros. The worker symbol is a private
 # implementation detail and is not part of the supported public API.
@@ -64,6 +64,36 @@ function validate_signature_args(args; context::String)
     return arg_symbols
 end
 
+function parse_trait_mapping(mapping; context::String)
+    if !(mapping isa Expr && mapping.head === :call && mapping.args[1] === :(=>))
+        throw(ArgumentError("$context expected `StateName => Type` or `StateName => [Type1, Type2]`."))
+    end
+
+    return mapping.args[2], mapping.args[3]
+end
+
+function parse_annotated_call(expr; context::String, syntax::String)
+    if !(expr isa Expr && expr.head === :(::))
+        throw(ArgumentError(syntax))
+    end
+
+    call_sig = expr.args[1]
+    annotation = expr.args[2]
+
+    if !(call_sig isa Expr && call_sig.head === :call)
+        throw(ArgumentError("Left side of `::` in $context must be a function call, e.g., `func(x)`"))
+    end
+
+    return call_sig.args[1], call_sig.args[2:end], annotation
+end
+
+function trait_worker_method_expr(func_name, state_name, args, body)
+    inner_sig = Expr(:call, trait_worker_name(func_name), :(::$state_name), args...)
+    return esc(Expr(:toplevel, quote
+        Base.@__doc__ $inner_sig = $body
+    end))
+end
+
 macro def_trait(trait_name, block)
     if !isa(trait_name, Symbol)
         throw(ArgumentError("Trait name must be a Symbol"))
@@ -92,16 +122,11 @@ macro def_trait(trait_name, block)
             continue
         end
 
-        if line isa Expr && line.head === :call && line.args[1] === :(=>)
-            state_name = line.args[2]
-            types_expr = line.args[3]
+        state_name, types_expr = parse_trait_mapping(line; context = "Malformed mapping.")
 
-            push!(exprs, :(struct $state_name <: $trait_name end))
+        push!(exprs, :(struct $state_name <: $trait_name end))
 
-            append!(exprs, trait_mapping_exprs(trait_name, state_name, types_expr))
-        else
-            throw(ArgumentError("Malformed mapping. Expected `StateName => Type` or `StateName => [Type1, Type2]`"))
-        end
+        append!(exprs, trait_mapping_exprs(trait_name, state_name, types_expr))
     end
 
     return esc(Expr(:toplevel, exprs...))
@@ -111,30 +136,18 @@ macro trait_map(trait_name, mapping)
     if !isa(trait_name, Symbol)
         throw(ArgumentError("Trait name must be a Symbol"))
     end
-    if !(mapping isa Expr && mapping.head === :call && mapping.args[1] === :(=>))
-        throw(ArgumentError("Expected syntax: @trait_map TraitName StateName => Type or [Type1, Type2]"))
-    end
 
-    state_name = mapping.args[2]
-    types_expr = mapping.args[3]
+    state_name, types_expr = parse_trait_mapping(mapping; context = "Expected syntax: @trait_map TraitName")
 
     return esc(Expr(:toplevel, trait_mapping_exprs(trait_name, state_name, types_expr)...))
 end
 
-macro trait_dispatcher(expr)
-    if !(expr isa Expr && expr.head === :(::))
-        throw(ArgumentError("Expected syntax: @trait_dispatcher function_name(args...) :: TraitName"))
-    end
-
-    call_sig = expr.args[1]
-    trait_name = expr.args[2]
-
-    if !(call_sig isa Expr && call_sig.head === :call)
-        throw(ArgumentError("Left side of `::` must be a function call, e.g., `func(x)`"))
-    end
-
-    func_name = call_sig.args[1]
-    args = call_sig.args[2:end]
+macro trait_dispatch(expr)
+    func_name, args, trait_name = parse_annotated_call(
+        expr;
+        context = "trait dispatcher",
+        syntax = "Expected syntax: @trait_dispatch function_name(args...) :: TraitName",
+    )
 
     if isempty(args)
         throw(ArgumentError("Trait dispatcher requires at least one argument to route."))
@@ -164,27 +177,13 @@ end
 
 # 1. Block Form (Handles multi-line `begin ... end` implementations)
 macro trait_function(sig, body)
-    if !(sig isa Expr && sig.head === :(::))
-        throw(ArgumentError("Expected signature like: function_name(args...) :: TraitState"))
-    end
-
-    call_sig = sig.args[1]
-    state_name = sig.args[2]
-
-    if !(call_sig isa Expr && call_sig.head === :call)
-        throw(ArgumentError("Left side of `::` must be a function call, e.g., `func(x)`"))
-    end
-
-    func_name = call_sig.args[1]
-    args = call_sig.args[2:end]
+    func_name, args, state_name = parse_annotated_call(
+        sig;
+        context = "trait function",
+        syntax = "Expected signature like: function_name(args...) :: TraitState",
+    )
     validate_signature_args(args; context = "Trait function")
-    inner_func = trait_worker_name(func_name)
-
-    inner_sig = Expr(:call, inner_func, :(::$state_name), args...)
-
-    return esc(Expr(:toplevel, quote
-        Base.@__doc__ $inner_sig = $body
-    end))
+    return trait_worker_method_expr(func_name, state_name, args, body)
 end
 
 # 2. Single-Argument Form (Handles one-liner `=` assignments)
@@ -203,24 +202,13 @@ macro trait_function(expr)
         throw(ArgumentError("Expected signature like: function_name(args...) :: TraitState"))
     end
 
-    call_sig = sig.args[1]
-    state_name = sig.args[2]
-
-    if !(call_sig isa Expr && call_sig.head === :call)
-        throw(ArgumentError("Left side of `::` must be a function call, e.g., `func(x)`"))
-    end
-
-    func_name = call_sig.args[1]
-    args = call_sig.args[2:end]
+    func_name, args, state_name = parse_annotated_call(
+        sig;
+        context = "trait function",
+        syntax = "Expected signature like: function_name(args...) :: TraitState",
+    )
     validate_signature_args(args; context = "Trait function")
-    inner_func = trait_worker_name(func_name)
-
-    # Explicitly construct the AST without macro-recursion
-    inner_sig = Expr(:call, inner_func, :(::$state_name), args...)
-
-    return esc(Expr(:toplevel, quote
-        Base.@__doc__ $inner_sig = $body
-    end))
+    return trait_worker_method_expr(func_name, state_name, args, body)
 end
 
 end  # module MacroTraits

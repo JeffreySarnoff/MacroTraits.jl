@@ -33,7 +33,7 @@ The package currently uses a deterministic internal worker symbol generated from
 
 That means:
 
-1. `@trait_dispatcher foo(x) :: Trait` and `@trait_function foo(...) :: State ...` independently derive the same worker symbol.
+1. `@trait_dispatch foo(x) :: Trait` and `@trait_function foo(...) :: State ...` independently derive the same worker symbol.
 2. No mutable shared registry is needed for those macros to cooperate.
 3. The worker is still internal, but it is deterministic.
 
@@ -67,7 +67,7 @@ There is no registry object to initialize, mutate, serialize, or reconcile acros
 
 1. Expansion is self-contained
 
-`@trait_dispatcher` and `@trait_function` can cooperate purely by code generation. They do not need runtime negotiation to find each other.
+`@trait_dispatch` and `@trait_function` can cooperate purely by code generation. They do not need runtime negotiation to find each other.
 
 1. Good fit for Julia dispatch
 
@@ -153,7 +153,7 @@ The current problem space is mostly solved by the namespaced deterministic appro
 
 The package already has:
 
-1. stable cooperation between `@trait_dispatcher` and `@trait_function`
+1. stable cooperation between `@trait_dispatch` and `@trait_function`
 2. materially reduced collision risk
 3. no need for runtime global coordination
 4. a clean path for tests and documentation

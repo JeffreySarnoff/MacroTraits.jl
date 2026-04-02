@@ -8,7 +8,7 @@ using MacroTraits
             StaticTupleBasic => [Tuple, NamedTuple]
         end
 
-        @trait_dispatcher process_items_basic(x)::SequenceBasic
+        @trait_dispatch process_items_basic(x)::SequenceBasic
         @trait_function process_items_basic(x)::DynamicVectorBasic = :dynamic
         @trait_function process_items_basic(x)::StaticTupleBasic = :static
 
@@ -22,7 +22,7 @@ using MacroTraits
             StaticTupleMulti => [Tuple, NamedTuple]
         end
 
-        @trait_dispatcher scale_data_multi(data, factor)::SequenceMulti
+        @trait_dispatch scale_data_multi(data, factor)::SequenceMulti
         @trait_function scale_data_multi(data, factor)::DynamicVectorMulti = data .* factor
         @trait_function scale_data_multi(data, factor)::StaticTupleMulti = map(v -> v * factor, data)
 
@@ -35,7 +35,7 @@ using MacroTraits
             DynamicVectorTyped => [Vector]
         end
 
-        @trait_dispatcher process_items_typed(x::Vector{Int})::SequenceTyped
+        @trait_dispatch process_items_typed(x::Vector{Int})::SequenceTyped
         @trait_function process_items_typed(x::Vector{Int})::DynamicVectorTyped = :ok
 
         @test process_items_typed([1, 2, 3]) == :ok
@@ -57,7 +57,7 @@ using MacroTraits
             StaticTupleExtension => [Tuple]
         end
 
-        @trait_dispatcher process_items_extension(x)::SequenceExtension
+        @trait_dispatch process_items_extension(x)::SequenceExtension
         @trait_function process_items_extension(x)::DynamicVectorExtension = :dynamic
         @trait_function process_items_extension(x)::StaticTupleExtension = :static
 
@@ -75,7 +75,7 @@ using MacroTraits
             DynamicVectorUnmapped => [Vector]
         end
 
-        @trait_dispatcher process_items_unmapped(x)::SequenceUnmapped
+        @trait_dispatch process_items_unmapped(x)::SequenceUnmapped
         @trait_function process_items_unmapped(x)::DynamicVectorUnmapped = :dynamic
 
         err = try
@@ -96,7 +96,7 @@ using MacroTraits
             DynamicVectorCollision => [Vector]
         end
 
-        @trait_dispatcher process_items_collision(x)::SequenceCollision
+        @trait_dispatch process_items_collision(x)::SequenceCollision
         @trait_function process_items_collision(x)::DynamicVectorCollision = :trait_path
 
         @test _process_items_collision([1, 2, 3]) == :user_helper
@@ -109,7 +109,7 @@ using MacroTraits
             StaticTupleMissingImpl => [Tuple]
         end
 
-        @trait_dispatcher process_items_missing_impl(x)::SequenceMissingImpl
+        @trait_dispatch process_items_missing_impl(x)::SequenceMissingImpl
         @trait_function process_items_missing_impl(x)::DynamicVectorMissingImpl = :dynamic
 
         err = try
@@ -129,7 +129,7 @@ using MacroTraits
             StaticTupleHygienic => [Tuple]
         end
 
-        @trait_dispatcher process_items_hygienic(trait_state)::SequenceHygienic
+        @trait_dispatch process_items_hygienic(trait_state)::SequenceHygienic
         @trait_function process_items_hygienic(trait_state)::DynamicVectorHygienic = (:dynamic, trait_state)
         @trait_function process_items_hygienic(trait_state)::StaticTupleHygienic = (:static, trait_state)
 
@@ -147,7 +147,7 @@ using MacroTraits
                 StaticTupleExternal => [Tuple]
             end
 
-            @trait_dispatcher process_items_external(trait_state)::SequenceExternal
+            @trait_dispatch process_items_external(trait_state)::SequenceExternal
             @trait_function process_items_external(trait_state)::DynamicVectorExternal = (:dynamic, trait_state)
             @trait_function process_items_external(trait_state)::StaticTupleExternal = (:static, trait_state)
             @trait_map SequenceExternal StaticTupleExternal => NamedTuple
@@ -160,7 +160,7 @@ using MacroTraits
 
     @testset "unsupported complex signatures are rejected explicitly" begin
         dispatcher_default = try
-            @macroexpand @trait_dispatcher process_items_default(x=1)::SequenceBasic
+            @macroexpand @trait_dispatch process_items_default(x=1)::SequenceBasic
             nothing
         catch caught
             caught
@@ -169,7 +169,7 @@ using MacroTraits
         @test occursin("does not support default values", sprint(showerror, dispatcher_default))
 
         dispatcher_varargs = try
-            @macroexpand @trait_dispatcher process_items_varargs(x...)::SequenceBasic
+            @macroexpand @trait_dispatch process_items_varargs(x...)::SequenceBasic
             nothing
         catch caught
             caught
@@ -178,7 +178,7 @@ using MacroTraits
         @test occursin("does not support varargs", sprint(showerror, dispatcher_varargs))
 
         dispatcher_destructure = try
-            @macroexpand @trait_dispatcher process_items_tuple((x, y))::SequenceBasic
+            @macroexpand @trait_dispatch process_items_tuple((x, y))::SequenceBasic
             nothing
         catch caught
             caught
@@ -211,10 +211,9 @@ using MacroTraits
 
         @test length(code_blocks) >= 6
 
-        mod = Module(:ReadmeExamplesModule)
-        Core.eval(mod, :(using Main.MacroTraits))
-
         for (index, block_match) in enumerate(code_blocks[1:6])
+            mod = Module(Symbol(:ReadmeExamplesModule_, index))
+            Core.eval(mod, :(using Main.MacroTraits))
             Core.eval(mod, Meta.parse("begin\n" * block_match.captures[1] * "\nend"))
         end
     end

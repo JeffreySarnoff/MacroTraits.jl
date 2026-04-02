@@ -2,6 +2,9 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 MacroTraits = "4292a6e8-468f-4059-9981-d251922fa000"
 
+[sources]
+MacroTraits = {path = ".."}
+
 [compat]
 Documenter = "1"
 julia = "1.12"
