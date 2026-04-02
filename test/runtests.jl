@@ -204,4 +204,18 @@ using MacroTraits
         @test trait_function_non_symbol_typed isa ArgumentError
         @test occursin("typed arguments of the form `name::Type`", sprint(showerror, trait_function_non_symbol_typed))
     end
+
+    @testset "README Julia examples execute" begin
+        readme_text = read(joinpath(@__DIR__, "..", "README.md"), String)
+        code_blocks = collect(eachmatch(r"```julia\r?\n(.*?)```"s, readme_text))
+
+        @test length(code_blocks) >= 6
+
+        mod = Module(:ReadmeExamplesModule)
+        Core.eval(mod, :(using Main.MacroTraits))
+
+        for (index, block_match) in enumerate(code_blocks[1:6])
+            Core.eval(mod, Meta.parse("begin\n" * block_match.captures[1] * "\nend"))
+        end
+    end
 end

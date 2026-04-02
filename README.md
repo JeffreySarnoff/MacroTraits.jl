@@ -100,16 +100,16 @@ Place the public API docstring on `@trait_dispatcher`. Place implementation-spec
 
 ```julia
 """
-    process_items(x)
+    documented_process_items(x)
 
 Public entry point for Sequence-based routing.
 """
-@trait_dispatcher process_items(x) :: Sequence
+@trait_dispatcher documented_process_items(x) :: Sequence
 
 """
 Implementation for dynamically sized collections.
 """
-@trait_function process_items(x) :: DynamicVector = :dynamic
+@trait_function documented_process_items(x) :: DynamicVector = :dynamic
 ```
 
 ## Advanced Extension Notes
@@ -126,26 +126,26 @@ If you need to define trait resolution methods manually, keep these rules:
 
 ```julia
 """
-    Sequence
+    IndustrialSequence
 
 An industrial trait determining if a collection is dynamically or statically sized.
 """
-@def_trait Sequence begin
-    DynamicVector => [Vector]
-    StaticTuple   => [Tuple, NamedTuple]
+@def_trait IndustrialSequence begin
+    IndustrialDynamicVector => [Vector]
+    IndustrialStaticTuple   => [Tuple, NamedTuple]
 end
 
 """
-    process_items(x)
+    best_practice_process_items(x)
 
-Routes incoming data to highly optimized mapping logic depending on its `Sequence`.
+Routes incoming data to highly optimized mapping logic depending on its `IndustrialSequence`.
 """
-@trait_dispatcher process_items(x) :: Sequence
+@trait_dispatcher best_practice_process_items(x) :: IndustrialSequence
 
 """
 Applies dynamic, in-place scaling to arrays.
 """
-@trait_function process_items(x::Vector{Float64}) :: DynamicVector begin
+@trait_function best_practice_process_items(x::Vector{Float64}) :: IndustrialDynamicVector begin
     x .*= 2.0
     return x
 end
@@ -155,13 +155,13 @@ end
 
 ```julia
 # Uses the Two-Argument Macro (Block Form)
-@trait_function process_items(x) :: DynamicVector begin
+@trait_function worker_example_process_items(x) :: DynamicVector begin
     println("Performing heavy lifting...")
     return "Vector logic. Length: $(length(x))"
 end
 
 # Uses the Single-Argument Macro (One-Liner Form)
-@trait_function process_items(x) :: StaticTuple = "Tuple logic. Length: $(length(x))"
+@trait_function worker_example_process_items(x) :: StaticTuple = "Tuple logic. Length: $(length(x))"
 ```
 
 ## Technical Note
@@ -176,7 +176,7 @@ For open-world extension, prefer `@trait_map` over writing trait resolution meth
 
 ```julia
 using Pkg
-Pkg.add("MacroTraits")
+Pkg.add(url = "https://github.com/JeffreySarnoff/MacroTraits.jl")
 ```
 
 ## Development
