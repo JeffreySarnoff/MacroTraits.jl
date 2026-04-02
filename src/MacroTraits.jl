@@ -2,7 +2,20 @@ module MacroTraits
 
 export @def_trait, @trait_map, @trait_dispatcher, @trait_function
 
+# Internal helper shared by the macros. The worker symbol is a private
+# implementation detail and is not part of the supported public API.
 trait_worker_name(func_name::Symbol) = Symbol("__macrotraits_trait_worker__", func_name)
+
+function invoke_trait_worker(public_func, worker_func, trait_state, args...)
+    try
+        return worker_func(trait_state, args...)
+    catch err
+        if err isa MethodError && err.f === worker_func
+            throw(MethodError(public_func, args))
+        end
+        rethrow()
+    end
+end
 
 function trait_mapping_exprs(trait_name, state_name, types_expr)
     types = types_expr isa Expr && types_expr.head === :vect ? types_expr.args : [types_expr]
@@ -106,6 +119,8 @@ macro trait_dispatcher(expr)
     # matches the user's source-level contract.
     target_arg = arg_symbols[1]
     inner_func = trait_worker_name(func_name)
+    invoke_helper = GlobalRef(@__MODULE__, :invoke_trait_worker)
+    trait_state_tmp = gensym(:trait_state)
 
     return esc(Expr(:toplevel, quote
         Base.@__doc__ function $func_name end
@@ -114,7 +129,8 @@ macro trait_dispatcher(expr)
         function $func_name($(args...))
             # Because $trait_name is flagged :foldable and :aggressive,
             # the compiler evaluates this perfectly at compile time.
-            return $inner_func($trait_name($target_arg), $(arg_symbols...))
+            local $trait_state_tmp = $trait_name($target_arg)
+            return $invoke_helper($func_name, $inner_func, $trait_state_tmp, $(arg_symbols...))
         end
     end))
 end

@@ -102,4 +102,59 @@ using MacroTraits
         @test _process_items_collision([1, 2, 3]) == :user_helper
         @test process_items_collision([1, 2, 3]) == :trait_path
     end
+
+    @testset "missing trait implementation fails at public API" begin
+        @def_trait SequenceMissingImpl begin
+            DynamicVectorMissingImpl => [Vector]
+            StaticTupleMissingImpl => [Tuple]
+        end
+
+        @trait_dispatcher process_items_missing_impl(x)::SequenceMissingImpl
+        @trait_function process_items_missing_impl(x)::DynamicVectorMissingImpl = :dynamic
+
+        err = try
+            process_items_missing_impl((1, 2, 3))
+            nothing
+        catch caught
+            caught
+        end
+
+        @test err isa MethodError
+        @test err.f === process_items_missing_impl
+    end
+
+    @testset "dispatcher temporary names are hygienic" begin
+        @def_trait SequenceHygienic begin
+            DynamicVectorHygienic => [Vector]
+            StaticTupleHygienic => [Tuple]
+        end
+
+        @trait_dispatcher process_items_hygienic(trait_state)::SequenceHygienic
+        @trait_function process_items_hygienic(trait_state)::DynamicVectorHygienic = (:dynamic, trait_state)
+        @trait_function process_items_hygienic(trait_state)::StaticTupleHygienic = (:static, trait_state)
+
+        @test process_items_hygienic([1, 2, 3]) == (:dynamic, [1, 2, 3])
+        @test process_items_hygienic((1, 2, 3)) == (:static, (1, 2, 3))
+    end
+
+    @testset "macros expand hygienically in another module" begin
+        mod = Module(:HygieneModule)
+        Core.eval(mod, :(using Main.MacroTraits))
+
+        Core.eval(mod, quote
+            @def_trait SequenceExternal begin
+                DynamicVectorExternal => [Vector]
+                StaticTupleExternal => [Tuple]
+            end
+
+            @trait_dispatcher process_items_external(trait_state)::SequenceExternal
+            @trait_function process_items_external(trait_state)::DynamicVectorExternal = (:dynamic, trait_state)
+            @trait_function process_items_external(trait_state)::StaticTupleExternal = (:static, trait_state)
+            @trait_map SequenceExternal StaticTupleExternal => NamedTuple
+        end)
+
+        @test Core.eval(mod, :(process_items_external([1, 2, 3]))) == (:dynamic, [1, 2, 3])
+        @test Core.eval(mod, :(process_items_external((1, 2, 3)))) == (:static, (1, 2, 3))
+        @test Core.eval(mod, :(process_items_external((a=1, b=2)))) == (:static, (a=1, b=2))
+    end
 end

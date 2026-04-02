@@ -19,6 +19,8 @@ MacroTraits.jl implements trait-based routing with four macros.
 
 At runtime, the public function computes `TraitName(first_argument)` and forwards that trait-state value plus the original arguments to the hidden worker.
 
+If trait resolution succeeds but no matching trait-state implementation exists, the call fails as the public function rather than surfacing the internal worker in the normal error path.
+
 ## Example
 
 ```julia
@@ -46,6 +48,12 @@ The public signature written in `@trait_dispatcher` is preserved exactly. If you
 ## Notes For Extension Authors
 
 Prefer `@trait_map` when extending an existing trait with new types. It generates the same foldable, constprop trait-resolution methods as `@def_trait`.
+
+For advanced manual extension, keep the same semantic contract as the generated mappings:
+
+1. Return a trait-state instance, not a type object.
+2. Only use foldable/constprop annotations when the trait resolver is semantically safe for them.
+3. Treat MacroTraits worker functions as private implementation details rather than extension points.
 
 ## Public Docs
 

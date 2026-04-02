@@ -15,6 +15,8 @@ MacroTraits.jl provides a small trait-dispatch surface built around four macros.
 
 At call time, the public function computes `Trait(x)` for the first argument and forwards the trait-state value plus the original arguments to the hidden worker. The worker name is intentionally internal and namespaced by MacroTraits rather than using a simple `_function_name` convention.
 
+If a trait resolves successfully but no matching `@trait_function` implementation exists for that trait state and signature, the call fails as the public function rather than exposing the internal worker in the normal error path.
+
 ## Example 1: Basic Single-Argument Trait
 
 This example shows the most fundamental use case: categorizing generic types into traits and routing a single-argument function.
@@ -109,6 +111,16 @@ Implementation for dynamically sized collections.
 """
 @trait_function process_items(x) :: DynamicVector = :dynamic
 ```
+
+## Advanced Extension Notes
+
+For most extension work, prefer `@trait_map`.
+
+If you need to define trait resolution methods manually, keep these rules:
+
+1. Return a trait-state instance such as `StaticTuple()`, not a type object.
+2. Preserve the same semantic contract as the generated methods: trait resolution should be safe to treat as foldable and aggressively const-propagated when you annotate it that way.
+3. Do not call MacroTraits internal worker functions directly. They are implementation details, not supported extension points.
 
 ## Best Practice Example
 
