@@ -28,6 +28,42 @@ function trait_mapping_exprs(trait_name, state_name, types_expr)
     return exprs
 end
 
+function validate_signature_args(args; context::String)
+    arg_symbols = Symbol[]
+
+    for arg in args
+        if arg isa Symbol
+            push!(arg_symbols, arg)
+            continue
+        end
+
+        if !(arg isa Expr)
+            throw(ArgumentError("$context only supports arguments of the form `name` or `name::Type`."))
+        end
+
+        if arg.head === :(::)
+            if !(arg.args[1] isa Symbol)
+                throw(ArgumentError("$context only supports typed arguments of the form `name::Type`."))
+            end
+            push!(arg_symbols, arg.args[1])
+        elseif arg.head === :(=)
+            throw(ArgumentError("$context does not support default values or keyword-style arguments."))
+        elseif arg.head === :kw
+            throw(ArgumentError("$context does not support default values."))
+        elseif arg.head === :(...)
+            throw(ArgumentError("$context does not support varargs."))
+        elseif arg.head === :tuple
+            throw(ArgumentError("$context does not support destructuring arguments."))
+        elseif arg.head === :parameters
+            throw(ArgumentError("$context does not support keyword arguments."))
+        else
+            throw(ArgumentError("$context only supports arguments of the form `name` or `name::Type`."))
+        end
+    end
+
+    return arg_symbols
+end
+
 macro def_trait(trait_name, block)
     if !isa(trait_name, Symbol)
         throw(ArgumentError("Trait name must be a Symbol"))
@@ -104,16 +140,7 @@ macro trait_dispatcher(expr)
         throw(ArgumentError("Trait dispatcher requires at least one argument to route."))
     end
 
-    arg_symbols = Symbol[]
-    for arg in args
-        if arg isa Symbol
-            push!(arg_symbols, arg)
-        elseif arg isa Expr && arg.head === :(::)
-            push!(arg_symbols, arg.args[1])
-        else
-            throw(ArgumentError("Complex signatures are not supported. Use simple `name` or `name::Type`."))
-        end
-    end
+    arg_symbols = validate_signature_args(args; context = "Trait dispatcher")
 
     # Keep the first argument exactly as written so the public method signature
     # matches the user's source-level contract.
@@ -150,6 +177,7 @@ macro trait_function(sig, body)
 
     func_name = call_sig.args[1]
     args = call_sig.args[2:end]
+    validate_signature_args(args; context = "Trait function")
     inner_func = trait_worker_name(func_name)
 
     inner_sig = Expr(:call, inner_func, :(::$state_name), args...)
@@ -184,6 +212,7 @@ macro trait_function(expr)
 
     func_name = call_sig.args[1]
     args = call_sig.args[2:end]
+    validate_signature_args(args; context = "Trait function")
     inner_func = trait_worker_name(func_name)
 
     # Explicitly construct the AST without macro-recursion

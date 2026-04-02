@@ -157,4 +157,51 @@ using MacroTraits
         @test Core.eval(mod, :(process_items_external((1, 2, 3)))) == (:static, (1, 2, 3))
         @test Core.eval(mod, :(process_items_external((a=1, b=2)))) == (:static, (a=1, b=2))
     end
+
+    @testset "unsupported complex signatures are rejected explicitly" begin
+        dispatcher_default = try
+            @macroexpand @trait_dispatcher process_items_default(x=1)::SequenceBasic
+            nothing
+        catch caught
+            caught
+        end
+        @test dispatcher_default isa ArgumentError
+        @test occursin("does not support default values", sprint(showerror, dispatcher_default))
+
+        dispatcher_varargs = try
+            @macroexpand @trait_dispatcher process_items_varargs(x...)::SequenceBasic
+            nothing
+        catch caught
+            caught
+        end
+        @test dispatcher_varargs isa ArgumentError
+        @test occursin("does not support varargs", sprint(showerror, dispatcher_varargs))
+
+        dispatcher_destructure = try
+            @macroexpand @trait_dispatcher process_items_tuple((x, y))::SequenceBasic
+            nothing
+        catch caught
+            caught
+        end
+        @test dispatcher_destructure isa ArgumentError
+        @test occursin("does not support destructuring", sprint(showerror, dispatcher_destructure))
+
+        trait_function_keyword = try
+            @macroexpand @trait_function process_items_keyword(x; y)::DynamicVectorBasic = :bad
+            nothing
+        catch caught
+            caught
+        end
+        @test trait_function_keyword isa ArgumentError
+        @test occursin("does not support keyword arguments", sprint(showerror, trait_function_keyword))
+
+        trait_function_non_symbol_typed = try
+            @macroexpand @trait_function process_items_nonsymbol((x, y)::Tuple)::DynamicVectorBasic = :bad
+            nothing
+        catch caught
+            caught
+        end
+        @test trait_function_non_symbol_typed isa ArgumentError
+        @test occursin("typed arguments of the form `name::Type`", sprint(showerror, trait_function_non_symbol_typed))
+    end
 end

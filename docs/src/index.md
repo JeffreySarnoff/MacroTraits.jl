@@ -45,6 +45,8 @@ process_items((1, 2, 3))
 
 The public signature written in `@trait_dispatcher` is preserved exactly. If you define `@trait_dispatcher f(x::Vector{Int}) :: Sequence`, then a call with `Vector{Float32}` fails at the public API boundary.
 
+MacroTraits intentionally supports only simple positional signatures written as `name` or `name::Type`. Default values, keyword arguments, varargs, and destructuring are rejected at macro-expansion time with explicit `ArgumentError`s.
+
 ## Notes For Extension Authors
 
 Prefer `@trait_map` when extending an existing trait with new types. It generates the same foldable, constprop trait-resolution methods as `@def_trait`.
