@@ -9,9 +9,8 @@ MacroTraits.jl provides a small trait-dispatch surface built around four macros.
 ## Mental Model
 
 1. `@def_trait` defines a trait abstract type, trait-state types, and trait resolution methods.
-2. `@trait_dispatch` defines the public function plus a hidden worker function.
-3. `@trait_function` adds methods to the hidden worker keyed by trait state.
-4. `@trait_map` adds new type-to-state mappings to an existing trait.
+2. `@trait_function` adds methods to the hidden worker keyed by trait state. The first call for a given function also auto-emits the public dispatcher.
+3. `@trait_map` adds new type-to-state mappings to an existing trait.
 
 At call time, the public function computes `Trait(x)` for the first argument and forwards the trait-state value plus the original arguments to the hidden worker. The worker name is intentionally internal and namespaced by MacroTraits rather than using a simple `_function_name` convention.
 
@@ -28,10 +27,8 @@ This example shows the most fundamental use case: categorizing generic types int
     StaticTuple   => [Tuple, NamedTuple]
 end
 
-# 2. Create the public dispatcher and hidden worker
-@trait_dispatch process_items(x) :: Sequence
-
-# 3. Add trait-state-specific worker methods
+# 2. Add trait-state-specific worker methods
+#    (the public dispatcher is emitted automatically on the first call)
 @trait_function process_items(x) :: DynamicVector begin
     return "Vector logic compiled. Length: $(length(x))"
 end
@@ -40,14 +37,14 @@ end
     return "Tuple logic compiled. Length: $(length(x))"
 end
 
-# 4. Test it!
+# 3. Test it!
 process_items([1, 2, 3]) 
 # "Vector logic compiled. Length: 3"
 ```
 
 ## Example 2: Multi-Argument Dispatch
 
-`@trait_dispatch` routes on the trait of the first argument and passes the remaining arguments through unchanged to the hidden worker method.
+`@trait_function` routes on the trait of the first argument and passes the remaining arguments through unchanged to the hidden worker method.
 
 ```julia
 @def_trait Sequence begin
@@ -55,10 +52,7 @@ process_items([1, 2, 3])
     StaticTuple   => [Tuple, NamedTuple]
 end
 
-# Define a public method that routes on `data`
-@trait_dispatch scale_data(data, factor) :: Sequence
-
-# Implement the vector variation
+# Implement the vector variation (also emits the public dispatcher)
 @trait_function scale_data(data, factor) :: DynamicVector begin
     data .*= factor 
     return data
@@ -89,8 +83,6 @@ Because trait resolution is ordinary Julia method dispatch, downstream users can
     StaticTuple   => [Tuple, NamedTuple]
 end
 
-@trait_dispatch process_items(x) :: Sequence
-
 @trait_function process_items(x) :: DynamicVector = (:dynamic, length(x))
 @trait_function process_items(x) :: StaticTuple = (:static, length(x))
 
@@ -112,7 +104,7 @@ process_items(my_tree)
 
 ## Public Docs Versus Implementation Docs
 
-Place the public API docstring on `@trait_dispatch`. Place implementation-specific docstrings on `@trait_function` methods.
+Place the public API docstring on the first `@trait_function` call — it auto-emits the public dispatcher and attaches the docstring to it. Place implementation-specific docstrings on subsequent `@trait_function` methods.
 
 ```julia
 @def_trait DocumentedSequence begin
@@ -123,11 +115,6 @@ end
     documented_process_items(x)
 
 Public entry point for Sequence-based routing.
-"""
-@trait_dispatch documented_process_items(x) :: DocumentedSequence
-
-"""
-Implementation for dynamically sized collections.
 """
 @trait_function documented_process_items(x) :: DocumentedDynamicVector = :dynamic
 ```
@@ -160,11 +147,6 @@ end
 
 Routes incoming data to highly optimized mapping logic depending on its `IndustrialSequence`.
 """
-@trait_dispatch best_practice_process_items(x) :: IndustrialSequence
-
-"""
-Applies dynamic, in-place scaling to arrays.
-"""
 @trait_function best_practice_process_items(x::Vector{Float64}) :: IndustrialDynamicVector begin
     x .*= 2.0
     return x
@@ -179,9 +161,7 @@ end
     WorkerExampleStaticTuple   => [Tuple, NamedTuple]
 end
 
-@trait_dispatch worker_example_process_items(x) :: WorkerExampleSequence
-
-# Uses the Two-Argument Macro (Block Form)
+# Uses the Two-Argument Macro (Block Form) — also emits the public dispatcher
 @trait_function worker_example_process_items(x) :: WorkerExampleDynamicVector begin
     println("Performing heavy lifting...")
     return "Vector logic. Length: $(length(x))"
@@ -196,7 +176,7 @@ worker_example_process_items((1, 2, 3))
 
 ## Technical Note
 
-`@trait_dispatch` preserves the public signature exactly as you write it, including a typed first argument. `@trait_function` preserves the signature you write on the hidden worker method. For example, if you define `@trait_dispatch trait_dispatch(x::Vector{Int64}) :: Sequence` and `@trait_function trait_dispatch(x::Vector{Int64}) :: DynamicVector = ...`, a call such as `trait_dispatch(Float32[1, 2, 3])` fails at the public API boundary instead of falling through to an internal worker-method error.
+The first-argument type constraint in the public dispatcher comes from the first `@trait_function` call for a given function. For example, if you write `@trait_function foo(x::Vector{Int}) :: DynamicVector = ...` first, the public `foo` method accepts only `Vector{Int}`. A call with `Float32[]` fails at the public API boundary instead of falling through to an internal worker-method error.
 
 The supported signature surface is intentionally narrow: positional arguments written as `name` or `name::Type`. Default values, keyword arguments, varargs, and destructuring are rejected during macro expansion with explicit `ArgumentError`s.
 

@@ -1,20 +1,10 @@
 module MacroTraits
 
-export @def_trait, @trait_map, @trait_function
+export @def_trait, @trait_map, @trait_dispatch, @trait_function
 
 # Internal helper shared by the macros. The worker symbol is a private
 # implementation detail and is not part of the supported public API.
 trait_worker_name(func_name::Symbol) = Symbol("__macrotraits_trait_worker__", func_name)
-
-# Registry populated at macro-expansion time by @def_trait.
-# Maps (defining_module, state_name) => trait_name so that @trait_function
-# can auto-emit the dispatcher on first use without an explicit @trait_dispatch.
-const _trait_for_state = Dict{Tuple{Module,Symbol},Symbol}()
-
-# Tracks which (module, func_name) pairs have already had their dispatcher emitted.
-const _dispatcher_emitted = Set{Tuple{Module,Symbol}}()
-
-trait_call_syntax_error() = "Expected signature like: function_name(args...) :: TraitState"
 
 function invoke_trait_worker(public_func, worker_func, trait_state, args...)
     try
@@ -29,11 +19,13 @@ end
 
 function trait_mapping_exprs(trait_name, state_name, types_expr)
     types = types_expr isa Expr && types_expr.head === :vect ? types_expr.args : [types_expr]
-    return [
-        quote
+    exprs = Any[]
+    for t in types
+        push!(exprs, quote
             Base.@assume_effects :foldable Base.@constprop :aggressive $trait_name(::$t) = $state_name()
-        end for t in types
-    ]
+        end)
+    end
+    return exprs
 end
 
 function validate_signature_args(args; context::String)
@@ -95,56 +87,11 @@ function parse_annotated_call(expr; context::String, syntax::String)
     return call_sig.args[1], call_sig.args[2:end], annotation
 end
 
-function parse_trait_function_signature(sig)
-    func_name, args, state_name = parse_annotated_call(
-        sig;
-        context="trait function",
-        syntax=trait_call_syntax_error(),
-    )
-    validate_signature_args(args; context="Trait function")
-    return func_name, args, state_name
-end
-
-function trait_worker_method_inner(func_name, state_name, args, body)
-    inner_sig = Expr(:call, trait_worker_name(func_name), :(::$state_name), args...)
-    return quote
-        Base.@__doc__ $inner_sig = $body
-    end
-end
-
 function trait_worker_method_expr(func_name, state_name, args, body)
     inner_sig = Expr(:call, trait_worker_name(func_name), :(::$state_name), args...)
     return esc(Expr(:toplevel, quote
         Base.@__doc__ $inner_sig = $body
     end))
-end
-
-# Returns an unescaped dispatcher expression for (m, func_name), or nothing if
-# the dispatcher has already been emitted or the state is not registered.
-function maybe_dispatcher_expr(m::Module, func_name::Symbol, args, state_name::Symbol)
-    isempty(args) && return nothing
-
-    trait_name_sym = get(_trait_for_state, (m, state_name), nothing)
-    trait_name_sym === nothing && return nothing
-
-    key = (m, func_name)
-    key ∈ _dispatcher_emitted && return nothing
-    push!(_dispatcher_emitted, key)
-
-    arg_symbols = validate_signature_args(args; context="Trait function (auto-dispatcher)")
-    target_arg = arg_symbols[1]
-    inner_func = trait_worker_name(func_name)
-    invoke_helper = GlobalRef(@__MODULE__, :invoke_trait_worker)
-    trait_state_tmp = gensym(:trait_state)
-
-    return quote
-        Base.@__doc__ function $func_name end
-        function $inner_func end
-        function $func_name($(args...))
-            local $trait_state_tmp = $trait_name_sym($target_arg)
-            return $invoke_helper($func_name, $inner_func, $trait_state_tmp, $(arg_symbols...))
-        end
-    end
 end
 
 macro def_trait(trait_name, block)
@@ -176,10 +123,6 @@ macro def_trait(trait_name, block)
         end
 
         state_name, types_expr = parse_trait_mapping(line; context="Malformed mapping.")
-
-        # Register immediately at expansion time so @trait_function can discover
-        # which trait owns this state without the user writing @trait_dispatch.
-        _trait_for_state[(__module__, state_name)] = trait_name
 
         push!(exprs, :(struct $state_name <: $trait_name end))
 
@@ -234,14 +177,13 @@ end
 
 # 1. Block Form (Handles multi-line `begin ... end` implementations)
 macro trait_function(sig, body)
-    func_name, args, state_name = parse_trait_function_signature(sig)
-    dispatch = maybe_dispatcher_expr(__module__, func_name, args, state_name)
-    worker = trait_worker_method_inner(func_name, state_name, args, body)
-    if dispatch !== nothing
-        return esc(Expr(:toplevel, dispatch, worker))
-    else
-        return esc(Expr(:toplevel, worker))
-    end
+    func_name, args, state_name = parse_annotated_call(
+        sig;
+        context="trait function",
+        syntax="Expected signature like: function_name(args...) :: TraitState",
+    )
+    validate_signature_args(args; context="Trait function")
+    return trait_worker_method_expr(func_name, state_name, args, body)
 end
 
 # 2. Single-Argument Form (Handles one-liner `=` assignments)
@@ -255,14 +197,18 @@ macro trait_function(expr)
     sig = expr.args[1]
     body = expr.args[2]
 
-    func_name, args, state_name = parse_trait_function_signature(sig)
-    dispatch = maybe_dispatcher_expr(__module__, func_name, args, state_name)
-    worker = trait_worker_method_inner(func_name, state_name, args, body)
-    if dispatch !== nothing
-        return esc(Expr(:toplevel, dispatch, worker))
-    else
-        return esc(Expr(:toplevel, worker))
+    # Validate the signature
+    if !(sig isa Expr && sig.head === :(::))
+        throw(ArgumentError("Expected signature like: function_name(args...) :: TraitState"))
     end
+
+    func_name, args, state_name = parse_annotated_call(
+        sig;
+        context="trait function",
+        syntax="Expected signature like: function_name(args...) :: TraitState",
+    )
+    validate_signature_args(args; context="Trait function")
+    return trait_worker_method_expr(func_name, state_name, args, body)
 end
 
 end  # module MacroTraits

@@ -1,4 +1,4 @@
-module MacroTraits
+module TraitMacros
 
 export @def_trait, @trait_map, @trait_function
 
@@ -27,13 +27,27 @@ function invoke_trait_worker(public_func, worker_func, trait_state, args...)
     end
 end
 
-function trait_mapping_exprs(trait_name, state_name, types_expr)
-    types = types_expr isa Expr && types_expr.head === :vect ? types_expr.args : [types_expr]
-    return [
-        quote
-            Base.@assume_effects :foldable Base.@constprop :aggressive $trait_name(::$t) = $state_name()
-        end for t in types
-    ]
+function parse_trait_mapping(mapping; context::String)
+    if !(mapping isa Expr && mapping.head === :call && mapping.args[1] === :(=>))
+        throw(ArgumentError("$context expected `StateName => Type` or `StateName => [Type1, Type2]`."))
+    end
+
+    return mapping.args[2], mapping.args[3]
+end
+
+function parse_annotated_call(expr; context::String, syntax::String)
+    if !(expr isa Expr && expr.head === :(::))
+        throw(ArgumentError(syntax))
+    end
+
+    call_sig = expr.args[1]
+    annotation = expr.args[2]
+
+    if !(call_sig isa Expr && call_sig.head === :call)
+        throw(ArgumentError("Left side of `::` in $context must be a function call, e.g., `func(x)`"))
+    end
+
+    return call_sig.args[1], call_sig.args[2:end], annotation
 end
 
 function validate_signature_args(args; context::String)
@@ -72,29 +86,6 @@ function validate_signature_args(args; context::String)
     return arg_symbols
 end
 
-function parse_trait_mapping(mapping; context::String)
-    if !(mapping isa Expr && mapping.head === :call && mapping.args[1] === :(=>))
-        throw(ArgumentError("$context expected `StateName => Type` or `StateName => [Type1, Type2]`."))
-    end
-
-    return mapping.args[2], mapping.args[3]
-end
-
-function parse_annotated_call(expr; context::String, syntax::String)
-    if !(expr isa Expr && expr.head === :(::))
-        throw(ArgumentError(syntax))
-    end
-
-    call_sig = expr.args[1]
-    annotation = expr.args[2]
-
-    if !(call_sig isa Expr && call_sig.head === :call)
-        throw(ArgumentError("Left side of `::` in $context must be a function call, e.g., `func(x)`"))
-    end
-
-    return call_sig.args[1], call_sig.args[2:end], annotation
-end
-
 function parse_trait_function_signature(sig)
     func_name, args, state_name = parse_annotated_call(
         sig;
@@ -103,6 +94,15 @@ function parse_trait_function_signature(sig)
     )
     validate_signature_args(args; context="Trait function")
     return func_name, args, state_name
+end
+
+function trait_mapping_exprs(trait_name, state_name, types_expr)
+    types = types_expr isa Expr && types_expr.head === :vect ? types_expr.args : [types_expr]
+    return [
+        quote
+            Base.@assume_effects :foldable Base.@constprop :aggressive $trait_name(::$t) = $state_name()
+        end for t in types
+    ]
 end
 
 function trait_worker_method_inner(func_name, state_name, args, body)

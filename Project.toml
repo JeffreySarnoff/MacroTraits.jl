@@ -1,7 +1,7 @@
 name = "MacroTraits"
 uuid = "4292a6e8-468f-4059-9981-d251922fa000"
 authors = ["Jeffrey Sarnoff <JeffreySarnoff@users.noreply.github.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [compat]
 julia = "1.12"

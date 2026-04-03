@@ -151,7 +151,7 @@ using MacroTraits
 
     @testset "unsupported complex signatures are rejected explicitly" begin
         dispatcher_default = try
-            @macroexpand MacroTraits.@trait_dispatch process_items_default(x=1)::SequenceBasic
+            @macroexpand @trait_dispatch process_items_default(x=1)::SequenceBasic
             nothing
         catch caught
             caught
@@ -160,7 +160,7 @@ using MacroTraits
         @test occursin("does not support default values", sprint(showerror, dispatcher_default))
 
         dispatcher_varargs = try
-            @macroexpand MacroTraits.@trait_dispatch process_items_varargs(x...)::SequenceBasic
+            @macroexpand @trait_dispatch process_items_varargs(x...)::SequenceBasic
             nothing
         catch caught
             caught
@@ -169,7 +169,7 @@ using MacroTraits
         @test occursin("does not support varargs", sprint(showerror, dispatcher_varargs))
 
         dispatcher_destructure = try
-            @macroexpand MacroTraits.@trait_dispatch process_items_tuple((x, y))::SequenceBasic
+            @macroexpand @trait_dispatch process_items_tuple((x, y))::SequenceBasic
             nothing
         catch caught
             caught
