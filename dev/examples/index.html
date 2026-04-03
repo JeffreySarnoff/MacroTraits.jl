@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · MacroTraits.jl</title><meta name="title" content="Examples · MacroTraits.jl"/><meta property="og:title" content="Examples · MacroTraits.jl"/><meta property="twitter:title" content="Examples · MacroTraits.jl"/><meta name="description" content="Documentation for MacroTraits.jl."/><meta property="og:description" content="Documentation for MacroTraits.jl."/><meta property="twitter:description" content="Documentation for MacroTraits.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MacroTraits.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Simple-Use"><span>Simple Use</span></a></li><li><a class="tocitem" href="#Common-Use:-Additional-Arguments"><span>Common Use: Additional Arguments</span></a></li><li><a class="tocitem" href="#Common-Use:-Preserve-A-Typed-Public-Boundary"><span>Common Use: Preserve A Typed Public Boundary</span></a></li><li><a class="tocitem" href="#Advanced-Application:-Open-World-Extension"><span>Advanced Application: Open-World Extension</span></a></li><li><a class="tocitem" href="#Advanced-Application:-Public-Docs-And-Private-Implementations"><span>Advanced Application: Public Docs And Private Implementations</span></a></li></ul></li><li><a class="tocitem" href="../internals/">Internals</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JeffreySarnoff/MacroTraits.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JeffreySarnoff/MacroTraits.jl/blob/main/docs/src/examples.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><p>This page moves from the smallest useful pattern to more realistic extension scenarios.</p><h2 id="Simple-Use"><a class="docs-heading-anchor" href="#Simple-Use">Simple Use</a><a id="Simple-Use-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-Use" title="Permalink"></a></h2><p>Use <code>@def_trait</code> when you want a single public function to route to different implementations based on the first argument&#39;s structural category.</p><pre><code class="language-julia hljs">@def_trait Sequence begin
+    DynamicVector =&gt; [Vector]
+    StaticTuple   =&gt; [Tuple, NamedTuple]
+end
+
+@trait_dispatch describe_items(x) :: Sequence
+
+@trait_function describe_items(x) :: DynamicVector = &quot;vector length $(length(x))&quot;
+@trait_function describe_items(x) :: StaticTuple = &quot;tuple length $(length(x))&quot;
+
+describe_items([1, 2, 3])
+# &quot;vector length 3&quot;
+
+describe_items((1, 2, 3))
+# &quot;tuple length 3&quot;</code></pre><p>Use this shape when the public behavior is the same operation, but the implementation differs by category.</p><h2 id="Common-Use:-Additional-Arguments"><a class="docs-heading-anchor" href="#Common-Use:-Additional-Arguments">Common Use: Additional Arguments</a><a id="Common-Use:-Additional-Arguments-1"></a><a class="docs-heading-anchor-permalink" href="#Common-Use:-Additional-Arguments" title="Permalink"></a></h2><p>Only the first argument participates in trait resolution. The remaining arguments pass through unchanged.</p><pre><code class="language-julia hljs">@def_trait SequenceScale begin
+    DynamicVectorScale =&gt; [Vector]
+    StaticTupleScale   =&gt; [Tuple]
+end
+
+@trait_dispatch scale_items(data, factor) :: SequenceScale
+
+@trait_function scale_items(data, factor) :: DynamicVectorScale = data .* factor
+@trait_function scale_items(data, factor) :: StaticTupleScale = map(x -&gt; x * factor, data)
+
+scale_items([1, 2], 10)
+# [10, 20]
+
+scale_items((1, 2), 10)
+# (10, 20)</code></pre><p>This is the common case when the trait selects the algorithm family and the remaining arguments provide configuration.</p><h2 id="Common-Use:-Preserve-A-Typed-Public-Boundary"><a class="docs-heading-anchor" href="#Common-Use:-Preserve-A-Typed-Public-Boundary">Common Use: Preserve A Typed Public Boundary</a><a id="Common-Use:-Preserve-A-Typed-Public-Boundary-1"></a><a class="docs-heading-anchor-permalink" href="#Common-Use:-Preserve-A-Typed-Public-Boundary" title="Permalink"></a></h2><p>The public signature is preserved exactly as written. That means ordinary Julia method filtering still happens before trait routing.</p><pre><code class="language-julia hljs">@def_trait TypedSequence begin
+    TypedVectorState =&gt; [Vector]
+end
+
+@trait_dispatch process_int_vector(x::Vector{Int}) :: TypedSequence
+@trait_function process_int_vector(x::Vector{Int}) :: TypedVectorState = sum(x)
+
+process_int_vector([1, 2, 3])
+# 6
+
+process_int_vector(Float32[1, 2, 3])
+# MethodError on the public function</code></pre><p>Use this when the trait is only part of your contract and you still want ordinary Julia dispatch to enforce a narrower API.</p><h2 id="Advanced-Application:-Open-World-Extension"><a class="docs-heading-anchor" href="#Advanced-Application:-Open-World-Extension">Advanced Application: Open-World Extension</a><a id="Advanced-Application:-Open-World-Extension-1"></a><a class="docs-heading-anchor-permalink" href="#Advanced-Application:-Open-World-Extension" title="Permalink"></a></h2><p>Downstream code can extend an existing trait without editing the original <code>@def_trait</code> block.</p><pre><code class="language-julia hljs">@def_trait SequenceExtension begin
+    DynamicVectorExtension =&gt; [Vector]
+    StaticTupleExtension   =&gt; [Tuple]
+end
+
+@trait_dispatch summarize_items(x) :: SequenceExtension
+
+@trait_function summarize_items(x) :: DynamicVectorExtension = (:dynamic, length(x))
+@trait_function summarize_items(x) :: StaticTupleExtension = (:static, length(x))
+
+struct MyTree
+    leaves::Int
+end
+
+Base.length(tree::MyTree) = tree.leaves
+
+@trait_map SequenceExtension StaticTupleExtension =&gt; MyTree
+
+summarize_items(MyTree(5))
+# (:static, 5)</code></pre><p>Use <code>@trait_map</code> for this path instead of writing low-level trait methods by hand. It keeps the extension aligned with the generated mappings.</p><h2 id="Advanced-Application:-Public-Docs-And-Private-Implementations"><a class="docs-heading-anchor" href="#Advanced-Application:-Public-Docs-And-Private-Implementations">Advanced Application: Public Docs And Private Implementations</a><a id="Advanced-Application:-Public-Docs-And-Private-Implementations-1"></a><a class="docs-heading-anchor-permalink" href="#Advanced-Application:-Public-Docs-And-Private-Implementations" title="Permalink"></a></h2><p>The public function is the stable API surface. The trait-specific methods are implementation detail entry points.</p><pre><code class="language-julia hljs">@def_trait NormalizationStyle begin
+    MutableNormalization =&gt; [Vector]
+end
+
+&quot;&quot;&quot;
+    normalize_items(x)
+
+Public entry point for normalization based on the `NormalizationStyle` trait.
+&quot;&quot;&quot;
+@trait_dispatch normalize_items(x) :: NormalizationStyle
+
+&quot;&quot;&quot;
+Implementation for mutable vectors.
+&quot;&quot;&quot;
+@trait_function normalize_items(x) :: MutableNormalization begin
+    total = sum(x)
+    return x ./ total
+end
+
+normalize_items([2.0, 3.0, 5.0])
+# [0.2, 0.3, 0.5]</code></pre><p>Documenting the macros this way keeps user-facing behavior attached to the public symbol rather than to the generated worker methods.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../internals/">Internals »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 3 April 2026 02:14">Friday 3 April 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
